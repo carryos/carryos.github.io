@@ -2,6 +2,6 @@
   "name": "CarryOS",
   "version": "1.0",
   "url": "https://www.archive.org/download/carryos.img/carryos.img.gz",
-  "sha256": "SHA256_OF_THE_UNCOMPRESSED_IMG_64_HEX_CHARS",
-  "size": 14000000000
+  "sha256": "a755a7b463d025f0faed40a79cb6482a3396b20e14a934df26928f4df46ab873",
+  "size": 15032385536
 }
