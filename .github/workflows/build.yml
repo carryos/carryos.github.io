@@ -1,0 +1,115 @@
+name: Build CarryOS Writer
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyinstaller
+      - run: pyinstaller --onefile --noconsole --uac-admin --name CarryOS-Writer-Windows carryos_writer.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarryOS-Writer-Windows
+          path: dist/CarryOS-Writer-Windows.exe
+
+  linux:
+    # Built on the oldest available Ubuntu so the AppImage runs on as many distros as possible.
+    # NOTE: ubuntu-22.04 runners are retired on 2027-04-17 - switch to ubuntu-24.04 then.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y python3-tk tk libfuse2
+      - run: pip install pyinstaller pillow
+      - run: pyinstaller --noconsole --name carryos-writer carryos_writer.py
+      - name: Build AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          # Put your own logo in the repo as icon.png (256x256); a placeholder is made if missing
+          [ -f icon.png ] || python3 -c "
+          from PIL import Image, ImageDraw
+          im = Image.new('RGBA', (256, 256), (0, 0, 0, 0))
+          d = ImageDraw.Draw(im)
+          d.ellipse((16, 16, 240, 240), fill=(20, 60, 120, 255))
+          d.ellipse((76, 76, 180, 180), outline=(255, 255, 255, 255), width=14)
+          im.save('icon.png')"
+          mkdir -p AppDir/usr/lib
+          cp -r dist/carryos-writer AppDir/usr/lib/carryos-writer
+          cp icon.png AppDir/carryos-writer.png
+          cat > AppDir/AppRun <<'APPRUN'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/lib/carryos-writer/carryos-writer" "$@"
+          APPRUN
+          chmod +x AppDir/AppRun
+          cat > AppDir/carryos-writer.desktop <<'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=CarryOS Writer
+          Exec=carryos-writer
+          Icon=carryos-writer
+          Categories=System;Utility;
+          Terminal=false
+          DESKTOP
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir CarryOS-Writer-Linux-x86_64.AppImage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarryOS-Writer-Linux
+          path: CarryOS-Writer-Linux-x86_64.AppImage
+
+  macos:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest      # Apple Silicon (M1/M2/M3/M4)
+            arch: arm64
+          - runner: macos-15-intel    # Intel Macs
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyinstaller
+      - run: pyinstaller --windowed --name "CarryOS Writer" --osx-bundle-identifier org.carryos.writer carryos_writer.py
+      - name: Build DMG
+        run: |
+          mkdir dmg
+          cp -R "dist/CarryOS Writer.app" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "CarryOS Writer" -srcfolder dmg -ov -format UDZO "CarryOS-Writer-macOS-${{ matrix.arch }}.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarryOS-Writer-macOS-${{ matrix.arch }}
+          path: CarryOS-Writer-macOS-${{ matrix.arch }}.dmg
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          
