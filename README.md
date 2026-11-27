@@ -49,6 +49,9 @@ CarryOS, bir USB belleğe sığan taşınabilir bir Linux dağıtımıdır. Şif
 
 ### Kurulum
 
+> [!IMPORTANT]
+> **Alternatif indirme bağlantısı:** Sihirbazdan ya da diğer bileşenlerden şüphe duyanlar imajı **[archive.org üzerinden](https://archive.org/download/carryos.img)** de indirebilir. Oradaki dosya sıkıştırılmıştır (`carryos.img.gz`).
+
 1. **İmajı indir:** [Sürümler](https://github.com/carryos/carryos.github.io/releases/latest) sayfasından `carryos.img` dosyasını indir ve SHA-256 toplamını doğrula.
 2. **USB'ye yaz:** En az 16 GB bir bellek kullan (USB 3.0 önerilir). balenaEtcher, Rufus (DD modu) ya da `dd` ile yazabilirsin.
 3. **USB'den başlat:** Bilgisayarı açarken boot menüsünü aç (F12, F10, Esc; Mac'te Option) ve belleği seç.
@@ -124,6 +127,9 @@ CarryOS is a portable Linux distribution that fits on a USB stick. Your encrypte
 | 🌐 **Light browser** | Web out of the box with NetSurf. Want a fuller browser? Install it with `apt`. |
 
 ### Installation
+
+> [!IMPORTANT]
+> **Alternative download link:** If you have doubts about the wizard or other components, you can also download the image **[from archive.org](https://archive.org/download/carryos.img)**. The file there is compressed (`carryos.img.gz`).
 
 1. **Download the image:** get `carryos.img` from the [Releases](https://github.com/carryos/carryos.github.io/releases/latest) page and verify its SHA-256 checksum.
 2. **Write it to a USB stick:** use at least 16 GB (USB 3.0 recommended). balenaEtcher, Rufus (DD mode) or `dd` all work.
