@@ -1,3 +1,10 @@
+> [!WARNING]
+> **🇹🇷 Önizleme sürümü: sihirbaz uyarıları hakkında**
+> CarryOS henüz önizleme (v0.1) aşamasında. Bu yüzden sihirbazda zaman zaman **yanlış alarm (false positive)** niteliğinde uyarılar çıkabiliyor. Her donanımda sorunsuz çalışacağı da henüz garanti değil. Emin olmadığın bir uyarı görürsen devam etmeden [Issues](https://github.com/carryos/carryos.github.io/issues) sayfasından uyarının metniyle birlikte bildir. Şüphe duyanlar ya da mevcut indirmeyi kullanmak istemeyenler imajı **[archive.org üzerinden](https://archive.org/download/carryos.img)** indirebilir.
+>
+> **🇬🇧 Preview release: about wizard warnings**
+> CarryOS is still in preview (v0.1). Because of this, the wizard may sometimes show warnings that are **false positives**. Smooth operation on every piece of hardware isn't guaranteed yet either. If you see a warning you're unsure about, stop and report it with its exact text on the [Issues](https://github.com/carryos/carryos.github.io/issues) page. If you have doubts or prefer not to use the main download, you can get the image **[from archive.org](https://archive.org/download/carryos.img)**.
+
 <div align="center">
 
 <img src="assets/img/logo.png" alt="CarryOS" width="160">
