@@ -8,6 +8,16 @@ window.CARRY_I18N = {
     "nav.why": "Idea", "nav.features": "Features", "nav.how": "Install", "nav.inside": "Inside the USB",
     "nav.compat": "Compatibility", "nav.faq": "FAQ", "nav.download": "Download",
 
+    "ad.label": "Advertisement",
+    "ab.chip": "Ad blocker detected",
+    "ab.title": 'Please turn off your ad blocker <em class="serif grad">to continue.</em>',
+    "ab.text": "CarryOS is free and open source. A few simple ads are what keep this site running. To keep using the site, disable your ad blocker for it or add it to your allow list.",
+    "ab.s1": "Click your ad blocker's icon in the browser.",
+    "ab.s2": "Choose “Pause” or “Allow” for this site.",
+    "ab.s3": "Reload the page with the button below.",
+    "ab.btn": "I turned it off, reload",
+    "ab.note": "Ads sit quietly between the content. Thank you.",
+
     "hero.eyebrow": "Preview release · Based on Debian 13",
     "hero.title": '<span class="line"><span>Your computer,</span></span><span class="line"><span class="serif grad">in your pocket.</span></span>',
     "hero.lead": "CarryOS is a portable Linux that fits on a USB stick. Your encrypted home folder, desktop and apps come with you — boot it on any computer and it becomes yours.",

@@ -308,3 +308,44 @@ code{font-family:var(--mono);font-size:.88em;background:rgba(236,232,220,.08);pa
 /* İngilizce başlık biraz daha uzun: ölçeği küçült */
 html[lang="en"] .display{font-size:clamp(2.6rem,5.7vw,5.6rem)}
 html[lang="en"] .mega{font-size:clamp(3rem,10vw,9rem)}
+
+/* ==========================================================
+   Reklamlar (AdSense) + reklam engelleyici uyarısı
+   ========================================================== */
+.ad-band{padding:clamp(8px,2vw,24px) 0}
+.ad{position:relative;border:1px solid var(--line);border-radius:22px;background:linear-gradient(160deg,rgba(236,232,220,.045),rgba(236,232,220,.01));overflow:hidden;
+  /* Genişlik korunur (AdSense ölçüm için ister), ama dolana kadar görünmez */
+  max-height:0;opacity:0;margin:0;padding:0;border-width:0;transition:opacity .6s var(--ease),max-height .6s var(--ease)}
+.ad.on{max-height:700px;opacity:1;padding:34px 18px 18px;border-width:1px}
+.ad-label{position:absolute;left:20px;top:12px;font:500 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.ad::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:var(--iri);opacity:.5}
+.ad ins{display:block;min-height:0;border-radius:12px;overflow:hidden}
+
+/* ---------- reklam engelleyici duvarı ---------- */
+html.ab-lock{overflow:hidden}
+.ab{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:20px;overflow-y:auto;
+  background:radial-gradient(60% 50% at 50% 35%,rgba(185,163,255,.20),transparent 70%),rgba(7,8,10,.86);
+  -webkit-backdrop-filter:blur(22px) saturate(1.3);backdrop-filter:blur(22px) saturate(1.3);
+  opacity:0;transition:opacity .5s var(--ease)}
+.ab[hidden]{display:none}
+.ab.in{opacity:1}
+.ab-card{position:relative;width:min(540px,100%);padding:clamp(28px,5vw,44px);border:1px solid var(--line2);border-radius:30px;text-align:center;overflow:hidden;
+  background:linear-gradient(160deg,rgba(236,232,220,.07),rgba(236,232,220,.015)),var(--panel);
+  box-shadow:0 50px 120px -30px rgba(185,163,255,.35),0 0 0 1px rgba(236,232,220,.03) inset;
+  transform:translateY(18px) scale(.98);transition:transform .7s var(--ease)}
+.ab.in .ab-card{transform:none}
+.ab-card::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--iri)}
+.ab-ico{width:68px;height:68px;margin:0 auto 18px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--line2);background:rgba(236,232,220,.04);box-shadow:0 0 50px rgba(185,163,255,.25)}
+.ab-ico svg{width:32px;height:32px;fill:none;stroke:#b9a3ff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ab-chip{display:inline-block;margin:0 0 16px;padding:7px 13px;border-radius:999px;border:1px solid rgba(255,213,138,.4);color:var(--warn);font:500 11.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.ab-title{margin:0 0 14px;font:600 clamp(1.7rem,5.4vw,2.4rem)/1.08 var(--disp);letter-spacing:-.035em}
+.ab-text{margin:0 0 24px;color:var(--muted);font-size:15.5px}
+.ab-steps{list-style:none;margin:0 0 26px;padding:0;display:grid;gap:10px;text-align:left}
+.ab-steps li{display:flex;align-items:center;gap:14px;padding:12px 16px;border:1px solid var(--line);border-radius:16px;background:rgba(236,232,220,.03)}
+.ab-steps span{flex:none;width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:var(--iri);color:#0a0a0c;font:600 13px/1 var(--mono)}
+.ab-steps p{margin:0;font-size:14.5px;color:var(--bone)}
+.ab-btn{width:100%}
+.ab-btn:hover svg{transform:rotate(90deg)}
+.ab-note{margin:16px 0 0;font:400 12.5px/1.5 var(--mono);color:var(--faint)}
+@media (max-width:640px){.ab{align-items:start;padding:14px}.ab-card{margin:auto 0;border-radius:26px}}
+@media (prefers-reduced-motion:reduce){.ab,.ab-card,.ad{transition:none}}
