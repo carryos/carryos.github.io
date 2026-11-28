@@ -20,6 +20,7 @@ latest.json fields:
 """
 import ctypes
 import hashlib
+import collections
 import http.client
 import json
 import lzma
@@ -46,7 +47,7 @@ APP_TITLE = "CarryOS Writer"
 MANIFEST_URL = os.environ.get(
     "DISTRO_MANIFEST", "https://carryos.github.io/latest.json"
 )
-APP_VERSION = "1.1.2"
+APP_VERSION = "1.1.3"
 UA = "CarryOSWriter/" + APP_VERSION
 BLOCK = 4 * 1024 * 1024
 ALIGN = 4096  # safe alignment for 512-byte and 4Kn disks
@@ -312,6 +313,97 @@ class Downloader:
                 time.sleep(min(2 * fails, 15))
 
 
+class ParallelDownloader:
+    """Downloads with several simultaneous HTTP Range connections and hands the data over in
+    order. Free hosts such as archive.org throttle every single connection, so several
+    connections add up. Memory use is bounded: about (workers + 2) segments are in RAM."""
+
+    SEG = 4 * 1024 * 1024
+
+    def __init__(self, url, cancel, workers):
+        self.url, self.cancel, self.workers = url, cancel, workers
+        self.pos, self.total = 0, None
+        self._stop = threading.Event()
+
+    def probe(self):
+        """Total size if the server supports Range requests, otherwise None."""
+        req = urllib.request.Request(self.url, headers={"User-Agent": UA, "Range": "bytes=0-0"})
+        with urlopen(req, timeout=30) as r:
+            if r.status != 206:
+                return None
+            m = re.fullmatch(r"bytes 0-0/(\d+)", (r.headers.get("Content-Range") or "").strip())
+            return int(m.group(1)) if m else None
+
+    def _fetch(self, start, end):
+        last = None
+        for attempt in range(8):
+            if self.cancel.is_set() or self._stop.is_set():
+                raise Cancelled()
+            try:
+                req = urllib.request.Request(
+                    self.url, headers={"User-Agent": UA, "Range": f"bytes={start}-{end}"})
+                with urlopen(req, timeout=30) as r:
+                    if r.status != 206:
+                        raise RuntimeError("The server does not support resuming downloads (Range).")
+                    buf = bytearray()
+                    while True:
+                        if self.cancel.is_set() or self._stop.is_set():
+                            raise Cancelled()
+                        b = r.read(1 << 20)
+                        if not b:
+                            break
+                        buf += b
+                if len(buf) != end - start + 1:
+                    raise OSError("Connection closed early")
+                return bytes(buf)
+            except (Cancelled, RuntimeError):
+                raise
+            except (urllib.error.URLError, OSError, http.client.HTTPException) as e:
+                if isinstance(e, urllib.error.HTTPError) and e.code < 500 and e.code != 429:
+                    raise RuntimeError(f"Server error: HTTP {e.code}")
+                last = e
+                time.sleep(min(2 * (attempt + 1), 15))
+        raise RuntimeError(f"Download failed: {last}")
+
+    def chunks(self):
+        from concurrent.futures import ThreadPoolExecutor
+        segs = iter([(a, min(a + self.SEG, self.total) - 1) for a in range(0, self.total, self.SEG)])
+        ex = ThreadPoolExecutor(max_workers=self.workers)
+        pending = collections.deque()
+        try:
+            for seg in segs:
+                pending.append(ex.submit(self._fetch, *seg))
+                if len(pending) >= self.workers + 2:
+                    break
+            while pending:
+                data = pending.popleft().result()
+                nxt = next(segs, None)
+                if nxt:
+                    pending.append(ex.submit(self._fetch, *nxt))
+                self.pos += len(data)
+                yield data
+        finally:
+            self._stop.set()
+            ex.shutdown(wait=False, cancel_futures=True)
+
+
+def make_downloader(url, cancel):
+    try:
+        workers = max(1, min(8, int(os.environ.get("CARRYOS_CONNECTIONS", "4"))))
+    except ValueError:
+        workers = 4
+    if workers > 1:
+        pd = ParallelDownloader(url, cancel, workers)
+        try:
+            total = pd.probe()
+        except Exception:
+            total = None
+        if total and total > 4 * ParallelDownloader.SEG:
+            pd.total = total
+            return pd
+    return Downloader(url, cancel)  # server without Range support: single connection
+
+
 MAX_OUT = 8 * 1024 * 1024        # largest piece the decompressor may hand us at once
 CACHE_EVERY = 64 * 1024 * 1024   # Linux: flush + drop the disk cache this often
 
@@ -381,14 +473,49 @@ def write_image(manifest, disk, emit, cancel):
     emit("status", "Preparing the disk...")
     prepare_disk(disk)
 
-    dl, dec, sha = Downloader(url, cancel), make_decoder(url), hashlib.sha256()
+    dl, dec, sha = make_downloader(url, cancel), make_decoder(url), hashlib.sha256()
     buf, out_bytes = bytearray(), 0
     t0, last = time.time(), 0.0
 
     since_flush = 0
+
+    # Download + decompress run in a helper thread, so the network and the (slow) USB drive
+    # work at the same time instead of waiting for each other. The queue is small (RAM).
+    q, stop, DONE = queue.Queue(maxsize=3), threading.Event(), object()
+
+    def put(item):
+        while not stop.is_set():
+            try:
+                q.put(item, timeout=0.5)
+                return True
+            except queue.Full:
+                pass
+        return False
+
+    def producer():
+        try:
+            for chunk in dl.chunks():
+                for data in decode_chunk(dec, chunk):
+                    if not put(data):
+                        return
+            put(DONE)
+        except BaseException as e:  # handed over to the writing side
+            put(e)
+
+    threading.Thread(target=producer, daemon=True).start()
+
+    def received():
+        while True:
+            item = q.get()
+            if item is DONE:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+
     with open_device(disk, True) as f:
-        for chunk in dl.chunks():
-            for data in decode_chunk(dec, chunk):
+        try:
+            for data in received():
                 sha.update(data)
                 out_bytes += len(data)
                 if out_bytes > disk["size"]:
@@ -412,6 +539,8 @@ def write_image(manifest, disk, emit, cancel):
                         frac = -1
                     speed = out_bytes / max(now - t0, 0.1) / 1e6
                     emit("progress", frac, f"Downloading and writing...  {speed:.1f} MB/s")
+        finally:
+            stop.set()  # stops the download thread on errors / cancel
         if dec is not None and not dec.eof:
             raise RuntimeError("The compressed file is incomplete or corrupt.")
         if buf:

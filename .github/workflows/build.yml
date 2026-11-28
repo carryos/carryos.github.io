@@ -136,6 +136,9 @@ jobs:
             - Windows'ta bazı bilgisayarlarda https bağlantılarının sessizce başarısız olması düzeltildi (sertifika listesi eklendi). / Fixed https silently failing on some Windows PCs (bundled certificate list).
             - İstatistikte her açılış ayrı sayılıyor. / Each launch is now counted separately in the statistics.
 
+            **Hız / Speed**
+            - İndirme 4 paralel bağlantıyla yapılıyor ve indirme ile USB'ye yazma aynı anda ilerliyor (yavaş sunucularda ~4 kat daha hızlı). / Downloads use 4 parallel connections, and downloading and writing to the USB drive now overlap (up to ~4x faster on throttled servers).
+
             **Yeni / New**
             - İstatistik gönderimi GoatCounter'ın kabul ettiği biçime getirildi. / Statistics requests now use a format GoatCounter accepts.
             - Anonim kullanım istatistiği (kapatılabilir; ad, cihaz adı, USB markası/seri no gönderilmez). / Anonymous usage statistics (can be turned off; no names, device names, USB brand or serial).

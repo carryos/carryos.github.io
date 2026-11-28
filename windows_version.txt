@@ -2,8 +2,8 @@
 # Windows .exe sürüm bilgisi (Dosya özellikleri > Ayrıntılar). PyInstaller --version-file ile kullanılır.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 1, 2, 0),
-    prodvers=(1, 1, 2, 0),
+    filevers=(1, 1, 3, 0),
+    prodvers=(1, 1, 3, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
       StringTable('040904B0', [
         StringStruct('CompanyName', 'CarryOS'),
         StringStruct('FileDescription', 'CarryOS Writer - writes CarryOS to a USB drive'),
-        StringStruct('FileVersion', '1.1.2.0'),
+        StringStruct('FileVersion', '1.1.3.0'),
         StringStruct('InternalName', 'CarryOS-Writer'),
         StringStruct('LegalCopyright', 'CarryOS - open source'),
         StringStruct('OriginalFilename', 'CarryOS-Writer-Windows.exe'),
         StringStruct('ProductName', 'CarryOS Writer'),
-        StringStruct('ProductVersion', '1.1.2.0')
+        StringStruct('ProductVersion', '1.1.3.0')
       ])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
