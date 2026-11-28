@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write       # build provenance (kaynak kodundan derlendiğinin kanıtı)
+  attestations: write
 
 jobs:
   windows:
@@ -17,7 +19,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pyinstaller
-      - run: pyinstaller --onefile --noconsole --uac-admin --name CarryOS-Writer-Windows carryos_writer.py
+      - run: pyinstaller --onefile --noconsole --uac-admin --version-file windows_version.txt --name CarryOS-Writer-Windows carryos_writer.py
       - uses: actions/upload-artifact@v4
         with:
           name: CarryOS-Writer-Windows
@@ -109,7 +111,30 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+      - name: SHA256 checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/*
       - uses: softprops/action-gh-release@v2
         with:
+          name: CarryOS Writer ${{ github.ref_name }}
+          body: |
+            ## CarryOS Writer 1.1
+
+            **Güvenlik / Security**
+            - Linux: pencere artık root olarak çalışmıyor; yalnızca küçük bir yazma yardımcısı `pkexec` ile yükseltiliyor. / Linux: the window no longer runs as root; only a small write helper is elevated.
+            - Sistem genelinde bellek önbelleği temizleme (`drop_caches`) kaldırıldı. / Removed the system-wide `drop_caches` call.
+            - İndirme yalnızca `https://`, SHA-256 doğrulaması zorunlu, yazmadan önce USB tekrar doğrulanıyor. / https-only downloads, mandatory SHA-256, USB re-checked right before writing.
+
+            **Yeni / New**
+            - Anonim kullanım istatistiği (kapatılabilir; ad, cihaz adı, USB markası/seri no gönderilmez). / Anonymous usage statistics (can be turned off; no names, device names, USB brand or serial).
+            - `SHA256SUMS.txt` ve GitHub build provenance kanıtı. / `SHA256SUMS.txt` and GitHub build provenance.
+
+            Windows'ta SmartScreen uyarısı çıkarsa: **Daha fazla bilgi → Yine de çalıştır**. Dosya henüz dijital imzalı değil. / If Windows SmartScreen warns: **More info → Run anyway**. The file is not code-signed yet.
           files: artifacts/*
-          
+

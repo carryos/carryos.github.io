@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zlib
 
@@ -42,7 +43,7 @@ APP_TITLE = "CarryOS Writer"
 MANIFEST_URL = os.environ.get(
     "DISTRO_MANIFEST", "https://carryos.github.io/latest.json"
 )
-UA = "CarryOSWriter/1.0"
+UA = "CarryOSWriter/1.1"
 BLOCK = 4 * 1024 * 1024
 ALIGN = 4096  # safe alignment for 512-byte and 4Kn disks
 IS_WIN = os.name == "nt"
@@ -53,6 +54,46 @@ NO_WINDOW = 0x08000000 if IS_WIN else 0
 
 class Cancelled(Exception):
     pass
+
+
+# ------------------------------------------------------------- network safety
+# Only https is accepted, also for redirects. (http://127.0.0.1 is allowed only
+# when DISTRO_ALLOW_HTTP=1 is set, which is meant for local tests.)
+ALLOW_HTTP = os.environ.get("DISTRO_ALLOW_HTTP") == "1"
+
+
+def check_url(u):
+    u = str(u)
+    if u.startswith("https://") or (ALLOW_HTTP and u.startswith("http://127.0.0.1")):
+        return u
+    raise ValueError("Only https:// addresses are accepted.")
+
+
+class _HttpsOnly(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        check_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_HttpsOnly)
+
+
+def urlopen(req, timeout):
+    check_url(req.full_url)
+    return _OPENER.open(req, timeout=timeout)
+
+
+def load_manifest():
+    """Downloads and validates latest.json. The SHA256 is mandatory."""
+    req = urllib.request.Request(MANIFEST_URL, headers={"User-Agent": UA})
+    with urlopen(req, timeout=15) as r:
+        m = json.loads(r.read(1 << 20).decode("utf-8"))
+    check_url(m.get("url", ""))
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", str(m.get("sha256") or "")):
+        raise ValueError("latest.json does not contain a valid sha256 value")
+    if m.get("size") is not None and int(m["size"]) <= 0:
+        raise ValueError("latest.json contains an invalid size value")
+    return m
 
 
 # --------------------------------------------------------------------- helpers
@@ -105,20 +146,19 @@ def relaunch_elevated():
         except FileNotFoundError:
             return False
 
-    # Linux. Inside an AppImage the FUSE mount is private to the current user,
-    # so root cannot run the binary from there: re-run the .AppImage file itself.
+    # Linux does not restart the whole program as root any more; only the small
+    # write helper is elevated (see write_via_helper).
+    return False
+
+
+def self_args():
+    """Command that starts this same program (used for the elevated write helper)."""
     appimage = os.environ.get("APPIMAGE")
-    if appimage:
-        args = [appimage] + sys.argv[1:]
-    keep = ("DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "LANG")
-    env = [f"{k}={os.environ[k]}" for k in keep if k in os.environ]
-    if appimage:
-        env.append("APPIMAGE_EXTRACT_AND_RUN=1")  # works even without FUSE for root
-    try:
-        rc = subprocess.call(["pkexec", "/usr/bin/env", *env, *args])
-    except FileNotFoundError:
-        return False
-    return rc not in (126, 127)
+    if appimage:  # the FUSE mount is private to the user: run the .AppImage file itself
+        return [appimage]
+    if getattr(sys, "frozen", False):
+        return [sys.executable]
+    return [sys.executable, os.path.abspath(__file__)]
 
 
 # ----------------------------------------------------------------------- disks
@@ -228,7 +268,7 @@ class Downloader:
                 headers["Range"] = f"bytes={self.pos}-"
             try:
                 req = urllib.request.Request(self.url, headers=headers)
-                with urllib.request.urlopen(req, timeout=30) as r:
+                with urlopen(req, timeout=30) as r:
                     if self.pos and r.status != 206:
                         raise RuntimeError("The server does not support resuming downloads (Range).")
                     if self.total is None and r.headers.get("Content-Length"):
@@ -272,6 +312,15 @@ def write_image(manifest, disk, emit, cancel):
     need = manifest.get("size")
     if need and disk["size"] < need:
         raise RuntimeError("The USB drive is not large enough for the image.")
+
+    # The drive list may be stale (drive swapped or removed): check again that this
+    # is still the same USB drive, and never touch anything that is not USB.
+    fresh = {d["path"]: d for d in list_usb_disks()}
+    if dev not in fresh or fresh[dev]["size"] != disk["size"]:
+        raise RuntimeError("The selected USB drive changed or was removed. Please select it again.")
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", str(manifest.get("sha256") or "")):
+        raise RuntimeError("Refusing to write: the image has no SHA256 to verify against.")
+    check_url(url)
 
     emit("status", "Preparing the disk...")
     prepare_disk(disk)
@@ -320,12 +369,7 @@ def write_image(manifest, disk, emit, cancel):
     # --- read back and verify
     emit("progress", 0.0, "Verifying...")
     if IS_LINUX:
-        run(["blockdev", "--flushbufs", dev])
-        try:
-            with open("/proc/sys/vm/drop_caches", "w") as c:
-                c.write("3")
-        except OSError:
-            pass
+        run(["blockdev", "--flushbufs", dev])  # flushes AND invalidates this device's cache
     # (macOS: the raw /dev/rdisk device bypasses the cache; Windows: unbuffered handle)
     h, remaining = hashlib.sha256(), out_bytes
     with open_device(disk, False) as f:
@@ -355,6 +399,145 @@ def write_image(manifest, disk, emit, cancel):
         run(["sync"])
 
 
+# ------------------------------------------------------ anonymous statistics
+# Sends a few anonymous COUNTERS to the same GoatCounter that the website uses
+# (cookie-free, no account, no IP stored). What is sent is exactly this and nothing else:
+#   - the event:   opened / started / done / cancelled / failed (+ a failure category)
+#   - the OS:      windows / linux / macos
+#   - USB size:    a range such as "32gb" (never the name, brand, serial or path)
+# No user name, computer name, file path, IP address or error text is ever sent.
+# Turn off: untick the box in the first window, start with --no-stats, or set
+# CARRYOS_NO_STATS=1.
+STATS_URL = "https://carry.goatcounter.com/count"
+STATS_OFF = ("--no-stats" in sys.argv) or os.environ.get("CARRYOS_NO_STATS") == "1"
+OS_NAME = "windows" if IS_WIN else "macos" if IS_MAC else "linux"
+
+
+def usb_bucket(size):
+    gb = size / 1e9
+    for limit, name in ((24, "16gb"), (48, "32gb"), (96, "64gb"), (192, "128gb")):
+        if gb < limit:
+            return name
+    return "256gb-plus"
+
+
+def fail_category(err):
+    m = str(err).lower()
+    for key, cat in (("permission", "permission"), ("changed or was removed", "usb-changed"),
+                     ("not large enough", "usb-too-small"), ("larger than the usb", "usb-too-small"),
+                     ("sha256 of the downloaded", "hash-mismatch"), ("verification failed", "verify"),
+                     ("could not read the usb", "verify"), ("download", "download"),
+                     ("server error", "download"), ("compressed file", "download"),
+                     ("pkexec", "permission"), ("unexpectedly", "other")):
+        if key in m:
+            return cat
+    return "other"
+
+
+def _send_ping(path, title):
+    try:
+        qs = urllib.parse.urlencode({"p": path, "t": title, "e": "true"})
+        req = urllib.request.Request(f"{STATS_URL}?{qs}", headers={"User-Agent": UA})
+        with urlopen(req, timeout=5) as r:
+            r.read(64)
+    except Exception:
+        pass  # statistics must never disturb the user
+
+
+def ping(enabled, event, *extra):
+    """event: opened/started/done/cancelled/failed; extra: more breakdown paths."""
+    if not enabled or STATS_OFF:
+        return
+    paths = [f"/writer/{event}", f"/writer/{event}-os/{OS_NAME}", *extra]
+    def go():
+        for pth in paths:
+            _send_ping(pth, pth.strip("/").replace("/", " "))
+    threading.Thread(target=go, daemon=True).start()
+
+
+# ----------------------------------------------------- Linux: elevated helper
+# The window runs as a normal user. Only this small helper runs as root: it has no
+# GUI, no display access, and takes nothing but a device path (it re-downloads and
+# re-validates the manifest itself and refuses anything that is not a USB drive).
+def run_helper(dev):
+    def emit(*a):
+        sys.stdout.write(json.dumps(a) + "\n")
+        sys.stdout.flush()
+
+    cancel = threading.Event()
+
+    def watch_stdin():  # the window sends "cancel" (or just closes the pipe)
+        try:
+            for line in sys.stdin:
+                if line.strip() == "cancel":
+                    break
+        except Exception:
+            pass
+        cancel.set()
+
+    threading.Thread(target=watch_stdin, daemon=True).start()
+    try:
+        if not re.fullmatch(r"/dev/[A-Za-z0-9]+", dev or ""):
+            raise RuntimeError("Invalid device path.")
+        manifest = load_manifest()
+        disk = next((d for d in list_usb_disks() if d["path"] == dev), None)
+        if disk is None:
+            raise RuntimeError("The selected drive is not a USB drive or is no longer available.")
+        write_image(manifest, disk, emit, cancel)
+        emit("done")
+    except Cancelled:
+        emit("error", "cancelled")
+    except Exception as e:
+        emit("error", str(e))
+
+
+def write_via_helper(disk, emit, cancel):
+    env = [f"{k}={os.environ[k]}" for k in ("LANG",) if k in os.environ]
+    if os.environ.get("APPIMAGE"):
+        env.append("APPIMAGE_EXTRACT_AND_RUN=1")  # works even without FUSE for root
+    cmd = ["pkexec", "/usr/bin/env", *env, *self_args(), "--helper", disk["path"]]
+    try:
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, text=True, bufsize=1)
+    except FileNotFoundError:
+        raise RuntimeError("pkexec (polkit) was not found; it is needed to get permission to write to the USB drive.")
+
+    def forward_cancel():
+        while p.poll() is None:
+            if cancel.is_set():
+                try:
+                    p.stdin.write("cancel\n")
+                    p.stdin.flush()
+                except Exception:
+                    pass
+                return
+            time.sleep(0.2)
+
+    threading.Thread(target=forward_cancel, daemon=True).start()
+    finished = False
+    for line in p.stdout:
+        try:
+            msg = json.loads(line)
+        except ValueError:
+            continue
+        if msg and msg[0] == "done":
+            finished = True
+        elif msg and msg[0] == "error":
+            p.wait()
+            if cancel.is_set():
+                raise Cancelled()
+            raise RuntimeError(str(msg[1]))
+        elif msg:
+            emit(*msg)
+    rc = p.wait()
+    if cancel.is_set():
+        raise Cancelled()
+    if not finished:
+        if rc in (126, 127):
+            raise RuntimeError("Administrator permission was not granted. It is required to write to the USB drive.")
+        raise RuntimeError("The write process ended unexpectedly.")
+
+
 # ------------------------------------------------------------------------- GUI
 def run_gui():
     import tkinter as tk
@@ -367,6 +550,8 @@ def run_gui():
             self.geometry("600x440")
             self.resizable(False, False)
             self.manifest, self.disks = None, []
+            self.stats_on = not STATS_OFF
+            self.stats_var = tk.BooleanVar(value=self.stats_on)
             self.cancel = threading.Event()
             self.q = queue.Queue()
             self.busy = False
@@ -410,23 +595,25 @@ def run_gui():
             self.info = self.label("Fetching version information...")
             self.label("This wizard downloads the system and writes it directly to your USB drive. "
                        "No temporary files are created on your computer.")
+            if not STATS_OFF:
+                ttk.Checkbutton(
+                    self.body, variable=self.stats_var, command=self.stats_toggled,
+                    text="Send anonymous usage statistics (only: started / finished / failed,\n"
+                         "your OS and the USB size range - no names, no drive name or serial)",
+                ).pack(anchor="w", pady=(16, 0))
             self.nav(nxt=None)
             if self.manifest:
                 self.show_manifest()
             else:
                 threading.Thread(target=self.fetch_manifest, daemon=True).start()
+                ping(self.stats_on, "opened")
+
+        def stats_toggled(self):
+            self.stats_on = bool(self.stats_var.get())
 
         def fetch_manifest(self):
             try:
-                req = urllib.request.Request(MANIFEST_URL, headers={"User-Agent": UA})
-                with urllib.request.urlopen(req, timeout=15) as r:
-                    m = json.loads(r.read().decode("utf-8"))
-                if not str(m.get("url", "")).startswith("https://"):
-                    raise ValueError("latest.json does not contain a valid https url")
-                sha = str(m.get("sha256") or "")
-                if sha and not re.fullmatch(r"[0-9a-fA-F]{64}", sha):
-                    raise ValueError("latest.json contains an invalid sha256 value")
-                self.q.put(("manifest", m))
+                self.q.put(("manifest", load_manifest()))
             except Exception as e:
                 self.q.put(("manifest_error", str(e)))
 
@@ -498,12 +685,20 @@ def run_gui():
 
         def worker(self, disk):
             emit = lambda *a: self.q.put(a)
+            on = self.stats_on
+            ping(on, "started")
             try:
-                write_image(self.manifest, disk, emit, self.cancel)
+                if IS_LINUX and not is_admin():
+                    write_via_helper(disk, emit, self.cancel)
+                else:
+                    write_image(self.manifest, disk, emit, self.cancel)
+                ping(on, "done", f"/writer/done-usb/{usb_bucket(disk['size'])}")
                 self.q.put(("done",))
             except Cancelled:
+                ping(on, "cancelled")
                 self.q.put(("error", "Cancelled. The contents of the USB drive are now corrupt; you will need to write it again."))
             except Exception as e:
+                ping(on, "failed", f"/writer/failed-reason/{fail_category(e)}")
                 self.q.put(("error", str(e)))
 
         def poll(self):
@@ -570,19 +765,23 @@ def run_gui():
 
 
 def main():
-    if not is_admin():
-        if relaunch_elevated():
-            return
-        try:
-            import tkinter as tk
-            from tkinter import messagebox
-            r = tk.Tk()
-            r.withdraw()
-            messagebox.showerror(APP_TITLE, "Administrator permission was not granted. It is required to write to the USB drive.")
-        except Exception:
-            print("Administrator permission is required.", file=sys.stderr)
+    if len(sys.argv) >= 3 and sys.argv[1] == "--helper":
+        run_helper(sys.argv[2])
         return
-    run_gui()
+    # Linux: the window runs unprivileged; only the write helper is elevated.
+    if IS_LINUX or is_admin():
+        run_gui()
+        return
+    if relaunch_elevated():
+        return
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+        r = tk.Tk()
+        r.withdraw()
+        messagebox.showerror(APP_TITLE, "Administrator permission was not granted. It is required to write to the USB drive.")
+    except Exception:
+        print("Administrator permission is required.", file=sys.stderr)
 
 
 if __name__ == "__main__":
