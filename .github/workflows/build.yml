@@ -131,6 +131,11 @@ jobs:
             - Sistem genelinde bellek önbelleği temizleme (`drop_caches`) kaldırıldı. / Removed the system-wide `drop_caches` call.
             - İndirme yalnızca `https://`, SHA-256 doğrulaması zorunlu, yazmadan önce USB tekrar doğrulanıyor. / https-only downloads, mandatory SHA-256, USB re-checked right before writing.
 
+            **Düzeltmeler / Fixes**
+            - Yazma sırasında bellek kullanımı çok azaltıldı (sıfır dolu imajlarda ~1,3 GB yerine ~50 MB); Linux bellek koruması artık programı kapatmamalı. / Much lower memory use while writing (~50 MB instead of ~1.3 GB on zero-heavy images), so Linux memory protection should no longer close the app.
+            - Windows'ta bazı bilgisayarlarda https bağlantılarının sessizce başarısız olması düzeltildi (sertifika listesi eklendi). / Fixed https silently failing on some Windows PCs (bundled certificate list).
+            - İstatistikte her açılış ayrı sayılıyor. / Each launch is now counted separately in the statistics.
+
             **Yeni / New**
             - İstatistik gönderimi GoatCounter'ın kabul ettiği biçime getirildi. / Statistics requests now use a format GoatCounter accepts.
             - Anonim kullanım istatistiği (kapatılabilir; ad, cihaz adı, USB markası/seri no gönderilmez). / Anonymous usage statistics (can be turned off; no names, device names, USB brand or serial).
