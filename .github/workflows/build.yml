@@ -124,7 +124,7 @@ jobs:
         with:
           name: CarryOS Writer ${{ github.ref_name }}
           body: |
-            ## CarryOS Writer 1.1
+            ## CarryOS Writer ${{ github.ref_name }}
 
             **Güvenlik / Security**
             - Linux: pencere artık root olarak çalışmıyor; yalnızca küçük bir yazma yardımcısı `pkexec` ile yükseltiliyor. / Linux: the window no longer runs as root; only a small write helper is elevated.
@@ -132,6 +132,7 @@ jobs:
             - İndirme yalnızca `https://`, SHA-256 doğrulaması zorunlu, yazmadan önce USB tekrar doğrulanıyor. / https-only downloads, mandatory SHA-256, USB re-checked right before writing.
 
             **Yeni / New**
+            - İstatistik gönderimi GoatCounter'ın kabul ettiği biçime getirildi. / Statistics requests now use a format GoatCounter accepts.
             - Anonim kullanım istatistiği (kapatılabilir; ad, cihaz adı, USB markası/seri no gönderilmez). / Anonymous usage statistics (can be turned off; no names, device names, USB brand or serial).
             - `SHA256SUMS.txt` ve GitHub build provenance kanıtı. / `SHA256SUMS.txt` and GitHub build provenance.
 

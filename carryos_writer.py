@@ -43,7 +43,8 @@ APP_TITLE = "CarryOS Writer"
 MANIFEST_URL = os.environ.get(
     "DISTRO_MANIFEST", "https://carryos.github.io/latest.json"
 )
-UA = "CarryOSWriter/1.1"
+APP_VERSION = "1.1.1"
+UA = "CarryOSWriter/" + APP_VERSION
 BLOCK = 4 * 1024 * 1024
 ALIGN = 4096  # safe alignment for 512-byte and 4Kn disks
 IS_WIN = os.name == "nt"
@@ -434,14 +435,28 @@ def fail_category(err):
     return "other"
 
 
+# GoatCounter silently drops requests whose User-Agent does not look like a browser
+# (it treats them as bots), so the app identifies itself in a browser-style string.
+_STATS_UA = {
+    "windows": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "macos": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+    "linux": "Mozilla/5.0 (X11; Linux x86_64)",
+}[OS_NAME] + " CarryOSWriter/" + APP_VERSION
+STATS_DEBUG = os.environ.get("CARRYOS_STATS_DEBUG") == "1"
+
+
 def _send_ping(path, title):
     try:
-        qs = urllib.parse.urlencode({"p": path, "t": title, "e": "true"})
-        req = urllib.request.Request(f"{STATS_URL}?{qs}", headers={"User-Agent": UA})
+        qs = urllib.parse.urlencode({"p": path, "t": title, "e": "true",
+                                     "rnd": format(int(time.time() * 1000) % 36**6, "x")})
+        req = urllib.request.Request(f"{STATS_URL}?{qs}", headers={"User-Agent": _STATS_UA})
         with urlopen(req, timeout=5) as r:
             r.read(64)
-    except Exception:
-        pass  # statistics must never disturb the user
+            if STATS_DEBUG:
+                print(f"[stats] {path} -> HTTP {r.status}", file=sys.stderr, flush=True)
+    except Exception as e:
+        if STATS_DEBUG:  # statistics must never disturb the user; errors are only shown in debug mode
+            print(f"[stats] {path} FAILED: {e}", file=sys.stderr, flush=True)
 
 
 def ping(enabled, event, *extra):
