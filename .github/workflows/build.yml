@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pyinstaller
+      - run: pip install pyinstaller certifi
       - run: pyinstaller --onefile --noconsole --uac-admin --version-file windows_version.txt --name CarryOS-Writer-Windows carryos_writer.py
       - uses: actions/upload-artifact@v4
         with:
@@ -35,7 +35,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: sudo apt-get update && sudo apt-get install -y python3-tk tk libfuse2
-      - run: pip install pyinstaller pillow
+      - run: pip install pyinstaller pillow certifi
       - run: pyinstaller --noconsole --name carryos-writer carryos_writer.py
       - name: Build AppImage
         env:
@@ -89,7 +89,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pyinstaller
+      - run: pip install pyinstaller certifi
       - run: pyinstaller --windowed --name "CarryOS Writer" --osx-bundle-identifier org.carryos.writer carryos_writer.py
       - name: Build DMG
         run: |
