@@ -1,3 +1,10 @@
+> [!WARNING]
+> **🇹🇷 Önizleme sürümü: sihirbaz uyarıları hakkında**
+> CarryOS henüz önizleme (v0.1) aşamasında. Bu yüzden sihirbazda zaman zaman **yanlış alarm (false positive)** niteliğinde uyarılar çıkabiliyor. Her donanımda sorunsuz çalışacağı da henüz garanti değil. Emin olmadığın bir uyarı görürsen devam etmeden [Issues](https://github.com/carryos/carryos.github.io/issues) sayfasından uyarının metniyle birlikte bildir. Şüphe duyanlar ya da mevcut indirmeyi kullanmak istemeyenler imajı **[archive.org üzerinden](https://archive.org/download/carryos.img)** indirebilir.
+>
+> **🇬🇧 Preview release: about wizard warnings**
+> CarryOS is still in preview (v0.1). Because of this, the wizard may sometimes show warnings that are **false positives**. Smooth operation on every piece of hardware isn't guaranteed yet either. If you see a warning you're unsure about, stop and report it with its exact text on the [Issues](https://github.com/carryos/carryos.github.io/issues) page. If you have doubts or prefer not to use the main download, you can get the image **[from archive.org](https://archive.org/download/carryos.img)**.
+
 <div align="center">
 
 <img src="assets/img/logo.png" alt="CarryOS" width="160">
@@ -48,6 +55,9 @@ CarryOS, bir USB belleğe sığan taşınabilir bir Linux dağıtımıdır. Şif
 | 🌐 **Hafif tarayıcı** | NetSurf ile kutudan çıkar çıkmaz web. Daha kapsamlısı için `apt` ile kur. |
 
 ### Kurulum
+
+> [!IMPORTANT]
+> **Alternatif indirme bağlantısı:** Sihirbazdan ya da diğer bileşenlerden şüphe duyanlar imajı **[archive.org üzerinden](https://archive.org/download/carryos.img)** de indirebilir. Oradaki dosya sıkıştırılmıştır (`carryos.img.gz`).
 
 1. **İmajı indir:** [Sürümler](https://github.com/carryos/carryos.github.io/releases/latest) sayfasından `carryos.img` dosyasını indir ve SHA-256 toplamını doğrula.
 2. **USB'ye yaz:** En az 16 GB bir bellek kullan (USB 3.0 önerilir). balenaEtcher, Rufus (DD modu) ya da `dd` ile yazabilirsin.
@@ -125,6 +135,9 @@ CarryOS is a portable Linux distribution that fits on a USB stick. Your encrypte
 
 ### Installation
 
+> [!IMPORTANT]
+> **Alternative download link:** If you have doubts about the wizard or other components, you can also download the image **[from archive.org](https://archive.org/download/carryos.img)**. The file there is compressed (`carryos.img.gz`).
+
 1. **Download the image:** get `carryos.img` from the [Releases](https://github.com/carryos/carryos.github.io/releases/latest) page and verify its SHA-256 checksum.
 2. **Write it to a USB stick:** use at least 16 GB (USB 3.0 recommended). balenaEtcher, Rufus (DD mode) or `dd` all work.
 3. **Boot from USB:** open the boot menu when powering on (F12, F10, Esc; Option on a Mac) and pick the stick.
@@ -180,16 +193,6 @@ Found a bug or have a suggestion? Open an [issue](https://github.com/carryos/car
 ---
 
 ## 🌐 Web sitesi / The website
-
-## Gizlilik ve güvenlik / Privacy & security
-
-**CarryOS Writer anonim istatistik gönderir (kapatılabilir).** Gönderilen tek şey sayaçlardır: *açıldı / yazma başladı / bitti / iptal / hata kategorisi*, işletim sistemi (windows, linux, macos) ve USB boyut aralığı (ör. `32gb`). Kullanıcı adı, bilgisayar adı, USB markası/modeli/seri numarası, dosya yolu, IP ve hata metni **gönderilmez**. Veriler siteyle aynı çerezsiz [GoatCounter](https://www.goatcounter.com) hesabına (`carry`) gider. Kapatmak için: ilk penceredeki kutuyu kaldır, `--no-stats` ile başlat ya da `CARRYOS_NO_STATS=1` ayarla.
-
-**Writer sends anonymous statistics (can be turned off).** Only counters: *opened / started / done / cancelled / failed category*, the OS and a USB size range (e.g. `32gb`). No user name, computer name, drive brand/model/serial, file path, IP or error text. Turn off: untick the box, start with `--no-stats`, or set `CARRYOS_NO_STATS=1`.
-
-**Linux'ta yetki ayrımı:** Pencere normal kullanıcı olarak çalışır; yalnızca küçük bir yazma yardımcısı `pkexec` ile root olur. Yardımcının ekran erişimi yoktur, yalnızca bir aygıt yolu alır, `latest.json`'ı kendisi indirip doğrular ve USB olmayan hiçbir aygıta yazmaz. İndirme yalnızca `https://` ile yapılır, SHA-256 zorunludur.
-
-**Sürüm doğrulama:** Her sürümle `SHA256SUMS.txt` yayınlanır ve dosyalar için GitHub *build provenance* kanıtı oluşturulur (`gh attestation verify <dosya> --repo <sahip>/<depo>`). Windows'ta SmartScreen uyarısı, dosyanın henüz dijital imzalı olmamasından gelir; "Daha fazla bilgi → Yine de çalıştır" ile devam edilir.
 
 Bu depo aynı zamanda [carryos.github.io](https://carryos.github.io) sitesinin kaynağıdır: saf HTML + CSS + JS, derleme adımı yok, bağımlılık yok. Ziyaret sayısı için çerezsiz, anonim [GoatCounter](https://www.goatcounter.com) kullanılır; başka izleme yok. Türkçe (varsayılan) ve İngilizce içerir.<br>
 This repository is also the source of [carryos.github.io](https://carryos.github.io): plain HTML + CSS + JS, no build step, no dependencies. Visit counts use cookie-free, anonymous [GoatCounter](https://www.goatcounter.com); no other tracking. Available in Turkish (default) and English.
